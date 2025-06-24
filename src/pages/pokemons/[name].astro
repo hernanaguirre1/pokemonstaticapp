@@ -1,0 +1,123 @@
+---
+import type { GetStaticPaths } from "astro";
+import type { PokemonListResponse } from "@interfaces/pokemon-list-response";
+
+import PokemonCard from  '@components/pokemons/PokemonCard.astro';
+import MainLayout from "@layouts/MainLayout.astro";
+import Title from "@components/shared/Title.astro";
+import { Icon } from 'astro-icon/components'; 
+
+export const getStaticPaths = ( async() => {
+
+    const resp = await fetch('https://pokeapi.co/api/v2/pokemon?limit=151');
+    const { results } = await resp.json() as PokemonListResponse;
+    return results.map( ({name,url}) => (
+        {
+            params: {name: name},
+            props: {name: name , url: url }
+        }
+    ))
+}) satisfies GetStaticPaths;
+
+
+const {  name } = Astro.params;
+const { url } = Astro.props;
+
+const id = url.split('/').at(-2)
+const audioSrc = `https://raw.githubusercontent.com/PokeAPI/cries/main/cries/pokemon/latest/${id}.ogg`;
+const imageSrc = `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${ id }.png`;
+const fromPage = Astro.url.searchParams.get("from");
+console.log(`Esta es la pagina ${fromPage}`);
+---
+
+<MainLayout 
+    title={`Pokemon - #${id} ${name}`}
+    description={`Inofrmación del Pokemon ${name}`}
+    image={imageSrc}
+>
+
+    <section class="mt-10 mx-10 flex flex-col  justify-center items-center">
+        <div class="flex flex-row">
+            <div id="cont">
+                <button onclick="history.back()"
+                class="cursor-pointer" 
+                >Regresar</button>
+                <Title>{name}</Title>
+            </div>
+            <button 
+            id="btn-favorite" 
+            class="ml-4 hover:animate-pulse"
+            class="text-blue-500 cursor-pointer "
+            data-name={name} 
+            data-id={id}>
+                <Icon data-outline name='heart-outline' size={50}/>
+                <Icon data-full class="hidden" name='heart-full' size={50}/>
+            </button>
+        </div>
+
+        <PokemonCard name={name} url= {url} isBig/>
+
+        <audio controls class="mt-5">
+            <source  src={audioSrc} type="audio/ogg">
+            Your browser does not support the audio element
+        </audio>
+    </section>
+
+
+</MainLayout>
+
+
+<script>
+
+    
+    import type { FavoritePokemon } from "@interfaces/favorite-pokemons";
+    // interface FavoritePokemon {
+    //     name:string;
+    //     id:number;
+
+
+    // }
+    const handlePageLoad = () => {
+
+        let favoritePokemons: FavoritePokemon[] = JSON.parse(
+            localStorage.getItem('favorites') ?? '[]',
+        );
+        const btnFavorite = document.querySelector('#btn-favorite') as HTMLButtonElement;
+
+        if( !btnFavorite) return;
+
+        const name = btnFavorite.dataset.name ?? '';
+        const id = btnFavorite.dataset.id ?? '';
+        const isFavorite = favoritePokemons.some(fav => fav.name === name );
+
+
+        const heartOutline = btnFavorite.querySelector('[data-outline]') as HTMLElement;
+        const heartFull = btnFavorite.querySelector('[data-full]') as HTMLElement;
+
+        if(isFavorite) {
+            heartOutline.classList.add('hidden');
+            heartFull.classList.remove('hidden');
+        }
+
+        const toggleFavorite = () => {
+            const isFavorite = favoritePokemons.some(fav => fav.name === name );
+            if(isFavorite) {
+               favoritePokemons = favoritePokemons.filter( fav => fav.name !== name )
+            }else {
+                favoritePokemons.push({
+                    id: +id,
+                    name: name
+                })
+            }
+
+            localStorage.setItem('favorites', JSON.stringify(favoritePokemons) );
+        }
+        btnFavorite.addEventListener('click', ()=> {
+            heartOutline.classList.toggle('hidden');
+            heartFull.classList.toggle('hidden');
+            toggleFavorite();
+        })
+    }
+    document.addEventListener('astro:page-load', handlePageLoad);
+    
+</script>
